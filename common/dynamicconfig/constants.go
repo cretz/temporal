@@ -456,6 +456,15 @@ const (
 	MatchingShutdownDrainDuration = "matching.shutdownDrainDuration"
 	// MatchingGetUserDataLongPollTimeout is the max length of long polls for GetUserData calls between partitions.
 	MatchingGetUserDataLongPollTimeout = "matching.getUserDataLongPollTimeout"
+	// MatchingTaskNotifyURL is the HTTP URL to POST a notification that a task was spooled.
+	MatchingTaskNotifyURL = "matching.taskNotifyURL"
+	// TODO(cretz): Max frequency to hit task notify URL on task spool which should default to less than
+	// matching.longPollExpirationInterval (like half?). But this is per matching service, a more ideal throttler would be
+	// cluster wide.
+
+	// TODO(cretz): Failure and backlog-still-non-zero backoff/retry settings for task-notify calls
+
+	// TODO(cretz): Invocation details like auth/TLS for task notify URL
 
 	// for matching testing only:
 

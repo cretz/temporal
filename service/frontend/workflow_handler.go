@@ -2720,7 +2720,7 @@ func (wh *WorkflowHandler) DescribeTaskQueue(ctx context.Context, request *workf
 	if err := wh.validateTaskQueue(request.TaskQueue); err != nil {
 		return nil, err
 	}
-	
+
 	if request.TaskQueueType == enumspb.TASK_QUEUE_TYPE_UNSPECIFIED {
 		request.TaskQueueType = enumspb.TASK_QUEUE_TYPE_WORKFLOW
 	}
@@ -2768,24 +2768,7 @@ func (wh *WorkflowHandler) GetSystemInfo(ctx context.Context, request *workflows
 		return nil, errRequestNotSet
 	}
 
-	return &workflowservice.GetSystemInfoResponse{
-		ServerVersion: headers.ServerVersion,
-		// Capabilities should be added as needed. In many cases, capabilities are
-		// hardcoded boolean true values since older servers will respond with a
-		// form of this message without the field which is implied false.
-		Capabilities: &workflowservice.GetSystemInfoResponse_Capabilities{
-			SignalAndQueryHeader:            true,
-			InternalErrorDifferentiation:    true,
-			ActivityFailureIncludeHeartbeat: true,
-			SupportsSchedules:               true,
-			EncodedFailureAttributes:        true,
-			UpsertMemo:                      true,
-			EagerWorkflowStart:              true,
-			SdkMetadata:                     true,
-			BuildIdBasedVersioning:          true,
-			CountGroupByExecutionStatus:     true,
-		},
-	}, nil
+	return cluster.SystemInfo(), nil
 }
 
 // ListTaskQueuePartitions returns all the partition and host for a task queue.

@@ -29,9 +29,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"sync/atomic"
 	"time"
 
+	"github.com/gogo/protobuf/jsonpb"
 	"go.temporal.io/server/common/clock"
 
 	commonpb "go.temporal.io/api/common/v1"
@@ -467,6 +470,12 @@ func (c *taskQueueManagerImpl) AddTask(
 	} else {
 		err = c.SpoolTask(params)
 	}
+
+	// Notify external task system if needed
+	if err == nil {
+		c.notifyExternalTaskSystem(params)
+	}
+
 	return false, err
 }
 
@@ -1075,4 +1084,59 @@ func (c *taskQueueManagerImpl) fetchUserData(ctx context.Context) error {
 	}
 
 	return ctx.Err()
+}
+
+func (c *taskQueueManagerImpl) notifyExternalTaskSystem(params addTaskParams) {
+	// TODO(cretz): Obviously this is unacceptably naive to just make a call every
+	// time. Rather, we need debouncing, retries, backoffs, throttling, logging,
+	// interval calls when backlog exists, etc.
+
+	url := c.config.TaskNotifyURL()
+	if url == "" {
+		return
+	}
+
+	// POST the capabilities and put other info in the header
+	// TODO(cretz): Obviously a custom client with more protections, auth, etc
+	// would be warranted
+	var bodyBuf bytes.Buffer
+	if err := new(jsonpb.Marshaler).Marshal(&bodyBuf, cluster.SystemInfo().Capabilities); err != nil {
+		// TODO(cretz): Should never happen
+		c.logger.Error("Failed marshaling capabilities", tag.Error(err))
+		return
+	}
+	req, err := http.NewRequest("POST", url, &bodyBuf)
+	if err != nil {
+		c.logger.Error("Failed creating request", tag.Error(err))
+		return
+	}
+
+	// Set a bunch of headers
+	// TODO(cretz): Make a new proto with all of this and just put capabilities
+	// inside of it
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Temporal-Namespace", c.namespace.String())
+	req.Header.Set("Temporal-TaskQueue", c.namespace.String())
+	req.Header.Set("Temporal-WorkflowId", params.execution.WorkflowId)
+	req.Header.Set("Temporal-WorkflowRunId", params.execution.RunId)
+
+	// Send asynchronously
+	c.logger.Debug("Sending task notify")
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			c.logger.Error("Task notify failed", tag.Error(err))
+			return
+		}
+		respBody, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			c.logger.Error("Reading body of task notify failed", tag.Error(err))
+		} else if resp.StatusCode != http.StatusOK {
+			c.logger.Error(
+				"Task notify returned non-200",
+				tag.NewInt("http-status-code", resp.StatusCode),
+				tag.NewBinaryTag("http-body", respBody))
+		}
+	}()
 }

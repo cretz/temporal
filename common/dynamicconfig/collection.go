@@ -86,6 +86,7 @@ type (
 	StringPropertyFn                           func() string
 	StringPropertyFnWithNamespaceFilter        func(namespace string) string
 	StringPropertyFnWithNamespaceIDFilter      func(namespaceID string) string
+	StringPropertyFnWithTaskQueueInfoFilters   func(namespace string, taskQueue string, taskType enumspb.TaskQueueType) string
 )
 
 const (
@@ -356,6 +357,19 @@ func (c *Collection) GetStringPropertyFnWithNamespaceIDFilter(key Key, defaultVa
 			key,
 			defaultValue,
 			namespaceIDPrecedence(namespaceID),
+			convertString,
+		)
+	}
+}
+
+// GetStringPropertyFilteredByTaskQueueInfo gets property with taskQueueInfo as filters and asserts that it's a string
+func (c *Collection) GetStringPropertyFilteredByTaskQueueInfo(key Key, defaultValue any) StringPropertyFnWithTaskQueueInfoFilters {
+	return func(namespace string, taskQueue string, taskType enumspb.TaskQueueType) string {
+		return matchAndConvert(
+			c,
+			key,
+			defaultValue,
+			taskQueuePrecedence(namespace, taskQueue, taskType),
 			convertString,
 		)
 	}

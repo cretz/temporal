@@ -67,6 +67,7 @@ type (
 		VersionBuildIdLimitPerQueue       dynamicconfig.IntPropertyFn
 		TaskQueueLimitPerBuildId          dynamicconfig.IntPropertyFn
 		GetUserDataLongPollTimeout        dynamicconfig.DurationPropertyFn
+		TaskNotifyURL                     dynamicconfig.StringPropertyFnWithTaskQueueInfoFilters
 
 		// Time to hold a poll request before returning an empty response if there are no tasks
 		LongPollExpirationInterval dynamicconfig.DurationPropertyFnWithTaskQueueInfoFilters
@@ -113,6 +114,8 @@ type (
 
 		GetUserDataLongPollTimeout dynamicconfig.DurationPropertyFn
 		GetUserDataMinWaitTime     time.Duration
+
+		TaskNotifyURL func() string
 
 		// taskWriter configuration
 		OutstandingTaskAppendsThreshold func() int
@@ -187,6 +190,7 @@ func NewConfig(
 		VersionBuildIdLimitPerQueue:           dc.GetIntProperty(dynamicconfig.VersionBuildIdLimitPerQueue, 100),
 		TaskQueueLimitPerBuildId:              dc.GetIntProperty(dynamicconfig.TaskQueuesPerBuildIdLimit, 20),
 		GetUserDataLongPollTimeout:            dc.GetDurationProperty(dynamicconfig.MatchingGetUserDataLongPollTimeout, 5*time.Minute),
+		TaskNotifyURL:                         dc.GetStringPropertyFilteredByTaskQueueInfo(dynamicconfig.MatchingTaskNotifyURL, ""),
 
 		AdminNamespaceToPartitionDispatchRate:          dc.GetFloatPropertyFilteredByNamespace(dynamicconfig.AdminMatchingNamespaceToPartitionDispatchRate, 10000),
 		AdminNamespaceTaskqueueToPartitionDispatchRate: dc.GetFloatPropertyFilteredByTaskQueueInfo(dynamicconfig.AdminMatchingNamespaceTaskqueueToPartitionDispatchRate, 1000),
@@ -232,6 +236,9 @@ func newTaskQueueConfig(id *taskQueueID, config *Config, namespace namespace.Nam
 		},
 		GetUserDataLongPollTimeout: config.GetUserDataLongPollTimeout,
 		GetUserDataMinWaitTime:     1 * time.Second,
+		TaskNotifyURL: func() string {
+			return config.TaskNotifyURL(namespace.String(), taskQueueName, taskType)
+		},
 		OutstandingTaskAppendsThreshold: func() int {
 			return config.OutstandingTaskAppendsThreshold(namespace.String(), taskQueueName, taskType)
 		},
